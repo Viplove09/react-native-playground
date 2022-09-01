@@ -1,0 +1,6 @@
+module Pods_photoDocPicker_photoDocPickerTests {
+  umbrella header "Pods-photoDocPicker-photoDocPickerTests-umbrella.h"
+
+  export *
+  module * { export * }
+}
