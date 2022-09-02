@@ -12,10 +12,19 @@ class AugmentedText extends React.Component {
   constructor(props, context) {
     super(props, context);
     this._listeners = null;
+    this.state = {
+      highlightStyle: {},
+    };
   }
   componentDidMount() {}
   componentWillUnmount() {
     // this._listeners.forEach((listener) => listener.remove());
+  }
+  applyHighLight(flag) {
+    if (flag) this.setState({ highlightStyle: styles.h });
+    else {
+      this.setState({ highlightStyle: {} });
+    }
   }
   render() {
     let renderText = this.props.children;
@@ -27,10 +36,7 @@ class AugmentedText extends React.Component {
     return (
       <ParsedText
         {...this.props}
-        style={[
-          this.props.highlightState > this.props.offset ? styles.h : {},
-          this.props.style,
-        ]}
+        style={[this.state.highlightStyle, this.props.style]}
         parse={[
           {
             pattern: mentionRegularExp,

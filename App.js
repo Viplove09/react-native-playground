@@ -16,11 +16,28 @@ import recording from "./recording";
 
 const App = () => {
   const [highlightState, setHighlight] = useState(0);
+  const audioSeek = useRef(0);
   const counterRunning = useRef(false);
   const interval = useRef();
-  console.log(highlightState);
+  const childrenReferences = useRef([]);
+  const lastHighlightCutoff = useRef(-1);
   const countUp = () => {
-    setHighlight((state) => state + 0.1);
+    // setHighlight((state) => state + 0.1);
+    audioSeek.current = audioSeek.current + 0.1;
+    // if (
+    //   audioSeek.current > recording.offsets[4] &&
+    //   lastHighlightCutoff.current != recording.offsets[4]
+    // ) {
+    //   console.log(audioSeek.current);
+    //   lastHighlightCutoff.current = recording.offsets[4];
+    //   childrenReferences.current[4].current.applyHighLight(true);
+    // }
+    highlightPainter(
+      recording.offsets,
+      childrenReferences.current,
+      lastHighlightCutoff,
+      audioSeek.current
+    );
   };
   return (
     <View style={{ flex: 1, marginTop: 200 }}>
@@ -31,7 +48,7 @@ const App = () => {
         childrenProps={{ allowFontScaling: false }}
       >
         {/* {recording.Words[0].Word} */}
-        {unpacker(recording.Words[0].Word, highlightState)}
+        {unpacker(recording.Words[0].Word, childrenReferences)}
       </View>
       <TouchableOpacity
         onPress={() => {
@@ -56,7 +73,7 @@ const domBuilder = (recording) => {
   recording = recording.replaceAll("&nbsp;", " ");
   const divRegex = new RegExp(/<(\/[a-z]+|[a-z0-9 ;\"=\.:-]+)>/g);
   componentStack = [];
-  rootComponent = { children: [] };
+  rootComponent = { children: [], offsets: [] };
   let search = divRegex.exec(recording);
   let count = 0;
   while (search) {
@@ -168,6 +185,7 @@ const domBuilder = (recording) => {
         for (item of splitTag) {
           if (item.indexOf("offset") > -1) {
             search.offset = parseFloat(item.match(/[0-9.]+/)[0]);
+            rootComponent.offsets.push(search.offset);
           } else if (item.indexOf("duration") > -1) {
             search.duration = parseFloat(item.match(/[0-9.]+/)[0]);
           }
@@ -186,17 +204,17 @@ const domBuilder = (recording) => {
     }
     search = divRegex.exec(recording);
   }
-  console.log(JSON.stringify(rootComponent));
-  console.log(count);
+  console.log(JSON.stringify(rootComponent.offsets));
   return rootComponent;
 };
 
-const unpacker = (recording, highlightState) => {
-  //   const compTree = domBuilder(recording);
-  return componentBuilder(recording, highlightState);
+const unpacker = (recording, childrenReferences) => {
+  // recording = domBuilder(recording);
+  childrenReferences.current = [];
+  return componentBuilder(recording, childrenReferences);
 };
 
-const componentBuilder = (compNode, highlightState) => {
+const componentBuilder = (compNode, childrenReferences) => {
   if (compNode.children.length > 0) {
     //recursive call
     return compNode.children.map((el, i) => (
@@ -204,22 +222,57 @@ const componentBuilder = (compNode, highlightState) => {
         key={i}
         style={[styles[el.type]]}
         // offset={el.offset}
-        // highlightState={highlightState}
       >
-        {componentBuilder(el, highlightState)}
+        {componentBuilder(el, childrenReferences)}
       </AugmentedText>
     ));
   } else {
+    const ref = useRef();
+    compNode.type === "a" ? childrenReferences.current.push(ref) : null;
     return (
       <AugmentedText
         style={styles[compNode.style]}
+        ref={compNode.type === "a" ? ref : null}
         offset={compNode.offset}
-        highlightState={highlightState}
       >
         {compNode.data}
         {compNode.type === "div" ? "\n" : ""}
       </AugmentedText>
     );
+  }
+};
+
+const highlightPainter = (
+  offsets,
+  references,
+  lastHighlightCutoff,
+  audioSeek
+) => {
+  let newhlCutoff = 0;
+  for (newhlCutoff; newhlCutoff < offsets.length; newhlCutoff++) {
+    if (offsets[newhlCutoff] > audioSeek) {
+      newhlCutoff = newhlCutoff - 1;
+      break;
+    }
+  }
+  if (newhlCutoff === offsets.length) newhlCutoff -= 1;
+
+  let stp, enp;
+  const flag = lastHighlightCutoff.current < newhlCutoff;
+  if (flag) {
+    stp = lastHighlightCutoff.current + 1;
+    enp = newhlCutoff;
+  } else {
+    if (newhlCutoff < lastHighlightCutoff.current) {
+      stp = newhlCutoff + 1;
+      enp = lastHighlightCutoff.current;
+    } else {
+      return;
+    }
+  }
+  lastHighlightCutoff.current = newhlCutoff;
+  for (stp; stp <= enp; stp++) {
+    references[stp].current.applyHighLight(flag);
   }
 };
 
